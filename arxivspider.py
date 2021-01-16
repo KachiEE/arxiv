@@ -9,11 +9,13 @@ HEADING = [
 
 class ArxivSpider(scrapy.Spider):
     name = 'arxiv'
+
     custom_settings = {
         'CONCURRENT_REQUEST_PER_DOMAIN': 1,
         'DOWNLOAD_DELAY': 5
     }
     start_urls = "https://arxiv.org/"
+
     headers = {
         'User_Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36 RuxitSynthetic/1.0 v8134650122 t38550 ath9b965f92 altpub cvcv=2'
     }
@@ -25,13 +27,13 @@ class ArxivSpider(scrapy.Spider):
         section = response.xpath("//div[@id='content']/h2/following-sibling::ul/li/a[1]/text()").getall()
         nextlinks = response.xpath("//div[@id='content']/h2/following-sibling::ul/li/a[1]/@href").getall()
 
+        # remove computer science link
         unwanted = [24, 23, 22, 21, 20, 14]
         for element in unwanted:
             del section[element]
-            del nextlinks[element] #remove computer science link
+            del nextlinks[element]
 
-        print(section)
-
+        # create csv file for each segment in the output folder.
         for i in range(len(nextlinks)):
             filename = './output/' + f'{section[i]}.csv'
             with open(filename, 'w', newline='') as f:
@@ -41,8 +43,11 @@ class ArxivSpider(scrapy.Spider):
             yield response.follow(nextlinks[i], self.segmentparse, cb_kwargs=dict(filename=filename))
 
     def segmentparse(self, response, filename):
+        # scrape links
         nextlinks = response.xpath("//div[@id='content']/ul[1]/li[4]/a/@href").getall()
         years = response.xpath("//div[@id='content']/ul[1]/li[4]/a/text()").getall()
+
+        # delete the first two links (not needed)
         del nextlinks[0]
         del years[0]
         for i in range(len(years)):
@@ -53,7 +58,7 @@ class ArxivSpider(scrapy.Spider):
         articles = response.xpath("//div[@id='content']//li/b/text()").getall()
         crosslistings = response.xpath("//div[@id='content']//li/i/text()").getall()
 
-        #make up to 12 months
+        # make each row up to 12 months by filling empty data
         if len(articles) < 12:
             articles = (12 - len(articles)) * [None] + articles
             crosslistings = (12 - len(crosslistings)) * [None] + crosslistings
@@ -63,11 +68,14 @@ class ArxivSpider(scrapy.Spider):
 
         data = [articles, crosslistings]
 
+        # write results to csv file
+
         with open(filename, 'a', newline='') as f:
             writer = csv.writer(f)
             writer.writerows(data)
 
 
+# start spider
 if __name__ == '__main__':
     process = CrawlerProcess()
     process.crawl(ArxivSpider)
